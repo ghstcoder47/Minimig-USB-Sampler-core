@@ -114,11 +114,11 @@ always @(posedge clk or posedge rst) begin
 					wvalid <= 1;
 					// The ring is only valid within one ring length behind the write position.
 					if (!init) begin
-						rptr <= (new_w - KEEP) & ~32'd1;
+						rptr <= (new_w < KEEP ? new_w : new_w - KEEP) & ~32'd1;
 						init <= 1;
 					end
 					else if (new_lag[31] || new_lag > maxlag)
-						rptr <= (new_w - KEEP) & ~32'd1;
+						rptr <= (new_w < KEEP ? new_w : new_w - KEEP) & ~32'd1;
 				end
 				st <= S_IDLE;
 			end
