@@ -371,7 +371,8 @@ always_ff @(posedge clk) begin
             cap_pop_cnt <= cap_pop_cnt + 1'd1;
             if (cap_pop_cnt == 9'd511) cap_hold <= 1'b0;
         end
-        if (toc_status[STATUS_FIFO_RECORD] == 1'b0) cap_hold <= 1'b0;
+        // Also release when the library stopped reading and the FIFO fell below half.
+        if (toc_status[STATUS_FIFO_RECORD] == 1'b0 || !cap.half_full) cap_hold <= 1'b0;
         if (cap.half_full && !cap_hold && toc_status[STATUS_FIFO_RECORD] == 1'b1 && toc_status[STATUS_RECORD_INTENA] == 1'b1) begin
             irq_reg[IRQ_RECORD_HALF] <= 1'b1; // Half full interrupt
         end

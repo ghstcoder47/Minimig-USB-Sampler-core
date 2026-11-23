@@ -187,6 +187,15 @@ logic        [3:0]  snap_n;
 logic signed [15:0] last_l, last_r, avg_l, avg_r;
 logic signed [38:0] prod_l, prod_r;
 
+// Rounded reciprocals can push a full-scale average just past 16 bits.
+function automatic signed [15:0] sat16(input signed [38:0] p);
+    logic signed [38:0] v;
+    begin
+        v = (p + 39'sd32768) >>> 16;
+        sat16 = (v > 39'sd32767) ? 16'sh7FFF : (v < -39'sd32768) ? 16'sh8000 : v[15:0];
+    end
+endfunction
+
 // 65536 / n, with n = 0 handled separately.
 function automatic [16:0] recip(input [3:0] n);
     case (n)
@@ -245,7 +254,7 @@ always_ff @(posedge clk) begin
         audio_delay <= audio_dev;
     end else if (cen == 1'b0) begin
         audio_delay <= audio_dev;
-    end else if (audio_delay == 0) begin
+    end else if (audio_delay <= 1) begin
         audio_delay <= audio_dev;
         ca_en <= 1'b1;
     end else begin
@@ -277,10 +286,10 @@ always_ff @(posedge clk) begin
         end
         S_AVG: begin
             // No source sample in this window: repeat the previous value.
-            avg_l  <= (snap_n == 0) ? (src_active ? last_l : 16'sd0) : 16'((prod_l + 39'sd32768) >>> 16);
-            avg_r  <= (snap_n == 0) ? (src_active ? last_r : 16'sd0) : 16'((prod_r + 39'sd32768) >>> 16);
-            last_l <= (snap_n == 0) ? last_l : 16'((prod_l + 39'sd32768) >>> 16);
-            last_r <= (snap_n == 0) ? last_r : 16'((prod_r + 39'sd32768) >>> 16);
+            avg_l  <= (snap_n == 0) ? (src_active ? last_l : 16'sd0) : sat16(prod_l);
+            avg_r  <= (snap_n == 0) ? (src_active ? last_r : 16'sd0) : sat16(prod_r);
+            last_l <= (snap_n == 0) ? last_l : sat16(prod_l);
+            last_r <= (snap_n == 0) ? last_r : sat16(prod_r);
             step   <= 2'd0;
             // Count gaps of the source stream (episodes), but not the start-up before the first sample.
             if (snap_n != 0) dbg_started <= 1'b1;
