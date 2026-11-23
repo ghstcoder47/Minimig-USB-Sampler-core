@@ -36,8 +36,8 @@ module usb_sampler #(parameter CLK_RATE = 28375160, parameter CLK_RATE_NTSC = 28
 	output      [7:0] out_u8      // PRB byte; Linux may pre-bias words for signed sampling
 );
 
-localparam AW = 13;               // 8192 frames, ~170 ms
-localparam PRIME = 4096;          // deep mode: frames collected before output starts (~85 ms)
+localparam AW = 15;               // 32768 frames, ~680 ms
+localparam PRIME = 24576;         // deep mode: frames collected before output starts (~0.5 s)
 
 reg  [31:0] mem[2**AW];
 // The extra pointer bit distinguishes empty from full after address wrap.
