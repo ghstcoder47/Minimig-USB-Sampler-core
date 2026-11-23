@@ -1574,26 +1574,12 @@ always @(posedge CLK_AUDIO) begin
 	if(old_d0 == old_d1) {dsnd_al, dsnd_ar} <= old_d1;
 end
 
-// Live monitor of the USB input while a Toccata (deep) recording is running, at -6 dB.
-reg [15:0] mon_l, mon_r;
-always @(posedge CLK_AUDIO) begin
-	reg [31:0] old_m0, old_m1;
-	reg        act0, act1;
-
-	act0 <= smp_active && smp_deep;
-	act1 <= act0;
-	old_m0 <= {smp_l, smp_r};
-	old_m1 <= old_m0;
-	if(old_m0 == old_m1) {mon_l, mon_r} <= act1 ? {old_m1[31], old_m1[31:17], old_m1[15], old_m1[15:1]} : 32'd0;
-	if(!act1) {mon_l, mon_r} <= 32'd0;
-end
-
 reg [15:0] out_l, out_r;
 always @(posedge CLK_AUDIO) begin
 	reg [17:0] tmp_l, tmp_r;
 
-	tmp_l <= {{2{aud_l[15]}},aud_l} + {{2{toccata_aud_left[15]}},toccata_aud_left} + (mt32_mute ? 18'd0 : {{2{mt32_i2s_l[15]}},mt32_i2s_l}) + {{2{cdda_sl[15]}}, cdda_sl} + {{2{dsnd_al[15]}}, dsnd_al} + {{2{mon_l[15]}}, mon_l};
-	tmp_r <= {{2{aud_r[15]}},aud_r} + {{2{toccata_aud_right[15]}},toccata_aud_right} + (mt32_mute ? 18'd0 : {{2{mt32_i2s_r[15]}},mt32_i2s_r}) + {{2{cdda_sr[15]}}, cdda_sr} + {{2{dsnd_ar[15]}}, dsnd_ar} + {{2{mon_r[15]}}, mon_r};
+	tmp_l <= {{2{aud_l[15]}},aud_l} + {{2{toccata_aud_left[15]}},toccata_aud_left} + (mt32_mute ? 18'd0 : {{2{mt32_i2s_l[15]}},mt32_i2s_l}) + {{2{cdda_sl[15]}}, cdda_sl} + {{2{dsnd_al[15]}}, dsnd_al};
+	tmp_r <= {{2{aud_r[15]}},aud_r} + {{2{toccata_aud_right[15]}},toccata_aud_right} + (mt32_mute ? 18'd0 : {{2{mt32_i2s_r[15]}},mt32_i2s_r}) + {{2{cdda_sr[15]}}, cdda_sr} + {{2{dsnd_ar[15]}}, dsnd_ar};
 
 	// clamp the output
 	out_l <= (tmp_l[17:15] == 3'b000 || tmp_l[17:15] == 3'b111) ? tmp_l[15:0] : {tmp_l[17], {15{~tmp_l[17]}}};
