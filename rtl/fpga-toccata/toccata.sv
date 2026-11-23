@@ -250,8 +250,6 @@ toccata_capture #(
 );
 
 
-wire signed [15:0] mon_left, mon_right, vol_left, vol_right;
-
 // Volume playback
 toccata_volume my_toccata_volume (
     .clk(clk),
@@ -262,34 +260,9 @@ toccata_volume my_toccata_volume (
     .mute_left(ad.ldm),
     .attenuation_right(ad.rda),
     .mute_right(ad.rdm),
-    .audio_out_left(vol_left),
-    .audio_out_right(vol_right)
+    .audio_out_left(out_left),
+    .audio_out_right(out_right)
 );
-
-// Monitor of the USB input (AD1848 loopback register 13: bit 0 enable, bits 7:2 attenuation).
-// Until the Amiga writes that register, monitoring is on at about -6 dB.
-logic mon_touched, mon_cfg;
-wire        mon_on  = mon_touched && smp_active && (!mon_cfg || ad1848_regs[13][0]);
-wire  [5:0] mon_att = mon_cfg ? ad1848_regs[13][7:2] : 6'd4;
-toccata_volume my_monitor_volume (
-    .clk(clk),
-    .rst(rst),
-    .audio_in_left(smp_l),
-    .audio_in_right(smp_r),
-    .attenuation_left(mon_att),
-    .mute_left(!mon_on),
-    .attenuation_right(mon_att),
-    .mute_right(!mon_on),
-    .audio_out_left(mon_left),
-    .audio_out_right(mon_right)
-);
-
-wire signed [16:0] mix_left  = vol_left  + mon_left;
-wire signed [16:0] mix_right = vol_right + mon_right;
-always_ff @(posedge clk) begin
-    out_left  <= (mix_left[16]  == mix_left[15])  ? mix_left[15:0]  : {mix_left[16],  {15{~mix_left[16]}}};
-    out_right <= (mix_right[16] == mix_right[15]) ? mix_right[15:0] : {mix_right[16], {15{~mix_right[16]}}};
-end
 
 
 // Sound FIFO, used to hold the ad1848 sound data
@@ -371,8 +344,6 @@ always_ff @(posedge clk) begin
         for(int i = 0; i < 16; i++) begin
             ad1848_regs[i] <= ad1848_reset_reg[i];
         end
-        mon_touched <= 1'b0;
-        mon_cfg <= 1'b0;
         // Reset the FIFO
         fifo.rst <= 1'b1;
         ad1848_index <= ad1848_reset_index;
@@ -517,8 +488,6 @@ always_ff @(posedge clk) begin
                     end
                     CODEC_REG_2: begin // 'h68xx - AD1848 register
                         if (lwr == 1'b1) begin
-                            mon_touched <= 1'b1;
-                            if (ad1848_index[3:0] == 4'hd) mon_cfg <= 1'b1;
                             `ifdef DEBUG
                             $display("write - index: %1h data: %2h", ad1848_index, data_in[15:8]);
                             `endif
