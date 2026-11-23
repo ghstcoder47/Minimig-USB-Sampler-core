@@ -26,10 +26,11 @@ module usb_ddr_reader #(parameter [28:0] BASE = 29'h03FE8000)
 
 	input             clk_sys,
 	output reg        fw,
-	output reg [31:0] fdata
+	output reg [31:0] fdata,
+	output reg        mon_en       // header[32]: monitor the USB input on the audio output (clk_114 domain)
 );
 
-localparam [31:0] MAGIC        = 32'h55534244;  // "USBD" in header[63:32]
+localparam [30:0] MAGIC        = 31'h2AA9A122;  // "USBD" (0x55534244 >> 1) in header[63:33]; header[32] = monitor flag
 localparam [31:0] KEEP         = 32'd1024;
 localparam [31:0] MAXLAG_NORM  = 32'd3072;
 localparam [31:0] MAXLAG_DEEP  = 32'd61440;
@@ -67,6 +68,7 @@ always @(posedge clk or posedge rst) begin
 		st     <= S_IDLE;
 		ddr_rd <= 0;
 		init   <= 0;
+		mon_en <= 0;
 		wvalid <= 0;
 		poll   <= 0;
 		tgl    <= 0;
@@ -101,11 +103,13 @@ always @(posedge clk or posedge rst) begin
 			tmo <= tmo + 1'd1;
 			if (ddr_dout_ready) begin
 				// Without the magic value the ARM side is not feeding the ring (older Main, device gone).
-				if (ddr_dout[63:32] != MAGIC) begin
+				if (ddr_dout[63:33] != MAGIC) begin
+					mon_en <= 0;
 					wvalid <= 0;
 					init   <= 0;
 				end
 				else begin
+					mon_en <= ddr_dout[32];
 					wptr   <= new_w;
 					wvalid <= 1;
 					// The ring is only valid within one ring length behind the write position.

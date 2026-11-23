@@ -655,6 +655,7 @@ wire        dsnd_rd, dsnd_busy, dsnd_ready;
 
 wire [28:0] smpd_addr, mux_addr;
 wire        smpd_rd, smpd_busy, smpd_ready, mux_rd, mux_busy, mux_ready;
+wire        smp_mon_c;
 wire        smp_fw;
 wire [31:0] smp_fdata;
 
@@ -690,7 +691,8 @@ usb_ddr_reader smp_ddr
 	.deep          (smp_deep),
 	.clk_sys       (clk_sys),
 	.fw            (smp_fw),
-	.fdata         (smp_fdata)
+	.fdata         (smp_fdata),
+	.mon_en        (smp_mon_c)
 );
 
 a2065_ddram_arbiter dsnd_arb
@@ -1574,13 +1576,16 @@ always @(posedge CLK_AUDIO) begin
 	if(old_d0 == old_d1) {dsnd_al, dsnd_ar} <= old_d1;
 end
 
-// Live monitor of the USB input while a Toccata (deep) recording is running, at -6 dB.
+// Live monitor of the USB input (OSD switch via the ring header), at -6 dB.
+reg [1:0] smp_mon_s;
+always @(posedge CLK_AUDIO) smp_mon_s <= {smp_mon_s[0], smp_mon_c};
+wire smp_mon = smp_mon_s[1];
 reg [15:0] mon_l, mon_r;
 always @(posedge CLK_AUDIO) begin
 	reg [31:0] old_m0, old_m1;
 	reg        act0, act1;
 
-	act0 <= smp_active && smp_deep;
+	act0 <= smp_active && smp_mon;
 	act1 <= act0;
 	old_m0 <= {smp_l, smp_r};
 	old_m1 <= old_m0;
