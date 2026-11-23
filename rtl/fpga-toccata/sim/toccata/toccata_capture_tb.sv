@@ -3,7 +3,7 @@
 `timescale 1ns/1ps
 
 module toccata_capture_tb;
-    localparam CLK = 28_359_380;
+    localparam CLK = 28_375_160;
 
     logic clk = 0;
     always #17.63 clk = ~clk;
@@ -16,7 +16,7 @@ module toccata_capture_tb;
     logic empty, half_full, full, endata;
 
     toccata_capture #(.CLK_FREQUENCY(CLK)) dut (
-        .clk, .rst, .cen, .freq_sel, .sm, .fmt, .lc, .css,
+        .clk, .rst, .ntsc(1'b0), .cen, .freq_sel, .sm, .fmt, .lc, .css,
         .src_ce, .src_l, .src_r, .src_active,
         .data_out, .rd, .empty, .half_full, .full, .endata
     );
@@ -95,14 +95,13 @@ module toccata_capture_tb;
 
         // Never read: the FIFO fills, then reports full without wrapping.
         run(1, 1, "overrun");
-        repeat (CLK / 16000 * 600) @(posedge clk);
+        repeat (CLK / 16000 * 3000) @(posedge clk);
         if (!full) begin $display("FAIL overrun: not full"); errors++; end
         cen = 0;
         repeat (4) @(posedge clk);
         if (!empty) begin $display("FAIL: cen low must flush"); errors++; end
 
-        if (errors == 0) $display("PASS");
-        else $display("%0d errors", errors);
-        $finish;
+        if (errors == 0) begin $display("PASS"); $finish; end
+        else $fatal(1, "%0d errors", errors);
     end
 endmodule

@@ -1053,6 +1053,7 @@ toccata #(
 	.toc_int(int6_toccata),
 	.out_left(toccata_aud_left),
 	.out_right(toccata_aud_right),
+	.ntsc(ntsc),
 	.smp_ce(smp_ce),
 	.smp_l(smp_l),
 	.smp_r(smp_r),

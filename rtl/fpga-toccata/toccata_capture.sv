@@ -14,13 +14,15 @@
 
 
 module toccata_capture #(
-    parameter int CLK_FREQUENCY = 28_359_380,
+    parameter int CLK_FREQUENCY = 28_375_160,
+    parameter int CLK_FREQUENCY_NTSC = 28_636_360,
     parameter int FIFO_SIZE = 8192
 ) (
     input  logic        clk,
     input  logic        rst,
 
     // Control parameters
+    input  wire         ntsc,       // system clock is the NTSC one
     input  wire         cen,        // Capture, disable - 0, enable - 1
     input  wire  [2:0]  freq_sel,   // See table below
     input  wire         sm,         // 0 - Mono, 1 - Stereo
@@ -82,6 +84,23 @@ localparam int DEV_1_44_1_KHZ = CLK_FREQUENCY / 44100;
 localparam int DEV_1_33_075_KHZ = CLK_FREQUENCY / 33075;
 localparam int DEV_1_6_615_KHZ = CLK_FREQUENCY / 6615;
 
+localparam int NDEV_0_8_KHZ = CLK_FREQUENCY_NTSC / 8000;
+localparam int NDEV_0_16_KHZ = CLK_FREQUENCY_NTSC / 16000;
+localparam int NDEV_0_27_43_KHZ = CLK_FREQUENCY_NTSC / 27430;
+localparam int NDEV_0_31_27_KHZ = CLK_FREQUENCY_NTSC / 31270;
+localparam int NDEV_0_54_86_KHZ = CLK_FREQUENCY_NTSC / 54860;
+localparam int NDEV_0_64_KHZ = CLK_FREQUENCY_NTSC / 64000;
+localparam int NDEV_0_48_KHZ = CLK_FREQUENCY_NTSC / 48000;
+localparam int NDEV_0_9_6_KHZ = CLK_FREQUENCY_NTSC / 9600;
+localparam int NDEV_1_5_5125_KHZ = CLK_FREQUENCY_NTSC / 5512;
+localparam int NDEV_1_11_025_KHZ = CLK_FREQUENCY_NTSC / 11025;
+localparam int NDEV_1_18_9_KHZ = CLK_FREQUENCY_NTSC / 18900;
+localparam int NDEV_1_22_05_KHZ = CLK_FREQUENCY_NTSC / 22050;
+localparam int NDEV_1_37_8_KHZ = CLK_FREQUENCY_NTSC / 37800;
+localparam int NDEV_1_44_1_KHZ = CLK_FREQUENCY_NTSC / 44100;
+localparam int NDEV_1_33_075_KHZ = CLK_FREQUENCY_NTSC / 33075;
+localparam int NDEV_1_6_615_KHZ = CLK_FREQUENCY_NTSC / 6615;
+
 // Frequency delay counter number of bits needed
 // to contain the devider for the audio frequencies
 localparam int DELAY_COUNTER_BITS = $clog2(DEV_1_5_5125_KHZ) - 1;
@@ -94,38 +113,38 @@ always_ff @(posedge clk) begin
     case ({css, freq_sel})
         // CSS is 0, 24.576 MHz
         4'h0:
-            audio_dev <= DEV_0_8_KHZ[DELAY_COUNTER_BITS:0];
+            audio_dev <= ntsc ? NDEV_0_8_KHZ[DELAY_COUNTER_BITS:0] : DEV_0_8_KHZ[DELAY_COUNTER_BITS:0];
         4'h1:
-            audio_dev <= DEV_0_16_KHZ[DELAY_COUNTER_BITS:0];
+            audio_dev <= ntsc ? NDEV_0_16_KHZ[DELAY_COUNTER_BITS:0] : DEV_0_16_KHZ[DELAY_COUNTER_BITS:0];
         4'h2:
-            audio_dev <= DEV_0_27_43_KHZ[DELAY_COUNTER_BITS:0];
+            audio_dev <= ntsc ? NDEV_0_27_43_KHZ[DELAY_COUNTER_BITS:0] : DEV_0_27_43_KHZ[DELAY_COUNTER_BITS:0];
         4'h3:
-            audio_dev <= DEV_0_31_27_KHZ[DELAY_COUNTER_BITS:0];
+            audio_dev <= ntsc ? NDEV_0_31_27_KHZ[DELAY_COUNTER_BITS:0] : DEV_0_31_27_KHZ[DELAY_COUNTER_BITS:0];
         4'h4:
-            audio_dev <= DEV_0_54_86_KHZ[DELAY_COUNTER_BITS:0]; // Not supported in real hardware
+            audio_dev <= ntsc ? NDEV_0_54_86_KHZ[DELAY_COUNTER_BITS:0] : DEV_0_54_86_KHZ[DELAY_COUNTER_BITS:0]; // Not supported in real hardware
         4'h5:
-            audio_dev <= DEV_0_64_KHZ[DELAY_COUNTER_BITS:0]; // Not supported in real hardwark
+            audio_dev <= ntsc ? NDEV_0_64_KHZ[DELAY_COUNTER_BITS:0] : DEV_0_64_KHZ[DELAY_COUNTER_BITS:0]; // Not supported in real hardwark
         4'h6:
-            audio_dev <= DEV_0_48_KHZ[DELAY_COUNTER_BITS:0];
+            audio_dev <= ntsc ? NDEV_0_48_KHZ[DELAY_COUNTER_BITS:0] : DEV_0_48_KHZ[DELAY_COUNTER_BITS:0];
         4'h7:
-            audio_dev <= DEV_0_9_6_KHZ[DELAY_COUNTER_BITS:0];
+            audio_dev <= ntsc ? NDEV_0_9_6_KHZ[DELAY_COUNTER_BITS:0] : DEV_0_9_6_KHZ[DELAY_COUNTER_BITS:0];
         // CSS is 1, 16.9344 MHz
         4'h8:
-            audio_dev <= DEV_1_5_5125_KHZ[DELAY_COUNTER_BITS:0];
+            audio_dev <= ntsc ? NDEV_1_5_5125_KHZ[DELAY_COUNTER_BITS:0] : DEV_1_5_5125_KHZ[DELAY_COUNTER_BITS:0];
         4'h9:
-            audio_dev <= DEV_1_11_025_KHZ[DELAY_COUNTER_BITS:0];
+            audio_dev <= ntsc ? NDEV_1_11_025_KHZ[DELAY_COUNTER_BITS:0] : DEV_1_11_025_KHZ[DELAY_COUNTER_BITS:0];
         4'ha:
-            audio_dev <= DEV_1_18_9_KHZ[DELAY_COUNTER_BITS:0];
+            audio_dev <= ntsc ? NDEV_1_18_9_KHZ[DELAY_COUNTER_BITS:0] : DEV_1_18_9_KHZ[DELAY_COUNTER_BITS:0];
         4'hb:
-            audio_dev <= DEV_1_22_05_KHZ[DELAY_COUNTER_BITS:0];
+            audio_dev <= ntsc ? NDEV_1_22_05_KHZ[DELAY_COUNTER_BITS:0] : DEV_1_22_05_KHZ[DELAY_COUNTER_BITS:0];
         4'hc:
-            audio_dev <= DEV_1_37_8_KHZ[DELAY_COUNTER_BITS:0];
+            audio_dev <= ntsc ? NDEV_1_37_8_KHZ[DELAY_COUNTER_BITS:0] : DEV_1_37_8_KHZ[DELAY_COUNTER_BITS:0];
         4'hd:
-            audio_dev <= DEV_1_44_1_KHZ[DELAY_COUNTER_BITS:0];
+            audio_dev <= ntsc ? NDEV_1_44_1_KHZ[DELAY_COUNTER_BITS:0] : DEV_1_44_1_KHZ[DELAY_COUNTER_BITS:0];
         4'he:
-            audio_dev <= DEV_1_33_075_KHZ[DELAY_COUNTER_BITS:0];
+            audio_dev <= ntsc ? NDEV_1_33_075_KHZ[DELAY_COUNTER_BITS:0] : DEV_1_33_075_KHZ[DELAY_COUNTER_BITS:0];
         4'hf:
-            audio_dev <= DEV_1_6_615_KHZ[DELAY_COUNTER_BITS:0];
+            audio_dev <= ntsc ? NDEV_1_6_615_KHZ[DELAY_COUNTER_BITS:0] : DEV_1_6_615_KHZ[DELAY_COUNTER_BITS:0];
     endcase
 
     `ifdef DEBUG
@@ -149,7 +168,7 @@ wire  [AW:0] level = wr_ptr - rd_ptr;
 always_comb begin
     empty     = (level == 0);
     full      = (level >= FIFO_FULL);
-    half_full = (level > FIFO_HALF) && !full;
+    half_full = (level > FIFO_HALF);
     endata    = ca_en;
 end
 
@@ -258,8 +277,8 @@ always_ff @(posedge clk) begin
         end
         S_AVG: begin
             // No source sample in this window: repeat the previous value.
-            avg_l  <= (snap_n == 0) ? last_l : 16'((prod_l + 39'sd32768) >>> 16);
-            avg_r  <= (snap_n == 0) ? last_r : 16'((prod_r + 39'sd32768) >>> 16);
+            avg_l  <= (snap_n == 0) ? (src_active ? last_l : 16'sd0) : 16'((prod_l + 39'sd32768) >>> 16);
+            avg_r  <= (snap_n == 0) ? (src_active ? last_r : 16'sd0) : 16'((prod_r + 39'sd32768) >>> 16);
             last_l <= (snap_n == 0) ? last_l : 16'((prod_l + 39'sd32768) >>> 16);
             last_r <= (snap_n == 0) ? last_r : 16'((prod_r + 39'sd32768) >>> 16);
             step   <= 2'd0;

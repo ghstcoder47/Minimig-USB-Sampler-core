@@ -1595,14 +1595,14 @@ end
 
 reg [15:0] out_l, out_r;
 always @(posedge CLK_AUDIO) begin
-	reg [17:0] tmp_l, tmp_r;
+	reg [18:0] tmp_l, tmp_r;
 
-	tmp_l <= {{2{aud_l[15]}},aud_l} + {{2{toccata_aud_left[15]}},toccata_aud_left} + (mt32_mute ? 18'd0 : {{2{mt32_i2s_l[15]}},mt32_i2s_l}) + {{2{cdda_sl[15]}}, cdda_sl} + {{2{dsnd_al[15]}}, dsnd_al} + {{2{mon_l[15]}}, mon_l};
-	tmp_r <= {{2{aud_r[15]}},aud_r} + {{2{toccata_aud_right[15]}},toccata_aud_right} + (mt32_mute ? 18'd0 : {{2{mt32_i2s_r[15]}},mt32_i2s_r}) + {{2{cdda_sr[15]}}, cdda_sr} + {{2{dsnd_ar[15]}}, dsnd_ar} + {{2{mon_r[15]}}, mon_r};
+	tmp_l <= {{3{aud_l[15]}},aud_l} + {{3{toccata_aud_left[15]}},toccata_aud_left} + (mt32_mute ? 19'd0 : {{3{mt32_i2s_l[15]}},mt32_i2s_l}) + {{3{cdda_sl[15]}}, cdda_sl} + {{3{dsnd_al[15]}}, dsnd_al} + {{3{mon_l[15]}}, mon_l};
+	tmp_r <= {{3{aud_r[15]}},aud_r} + {{3{toccata_aud_right[15]}},toccata_aud_right} + (mt32_mute ? 19'd0 : {{3{mt32_i2s_r[15]}},mt32_i2s_r}) + {{3{cdda_sr[15]}}, cdda_sr} + {{3{dsnd_ar[15]}}, dsnd_ar} + {{3{mon_r[15]}}, mon_r};
 
 	// clamp the output
-	out_l <= (tmp_l[17:15] == 3'b000 || tmp_l[17:15] == 3'b111) ? tmp_l[15:0] : {tmp_l[17], {15{~tmp_l[17]}}};
-	out_r <= (tmp_r[17:15] == 3'b000 || tmp_r[17:15] == 3'b111) ? tmp_r[15:0] : {tmp_r[17], {15{~tmp_r[17]}}};
+	out_l <= (tmp_l[18:15] == 4'b0000 || tmp_l[18:15] == 4'b1111) ? tmp_l[15:0] : {tmp_l[18], {15{~tmp_l[18]}}};
+	out_r <= (tmp_r[18:15] == 4'b0000 || tmp_r[18:15] == 4'b1111) ? tmp_r[15:0] : {tmp_r[18], {15{~tmp_r[18]}}};
 end
 
 assign AUDIO_S = 1;

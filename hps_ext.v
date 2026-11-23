@@ -108,7 +108,7 @@ assign io_fpga = EXT_BUS[35];
 localparam EXT_CMD_MIN  = UIO_GET_VMODE;
 localparam EXT_CMD_MAX  = UIO_SET_VPOS;
 localparam EXT_CMD_MIN2 = 'h61;
-localparam EXT_CMD_MAX2 = 'h63;
+localparam EXT_CMD_MAX2 = 'h64;
 
 localparam UIO_MOUSE     = 'h04;
 localparam UIO_KEYBOARD  = 'h05;
@@ -190,6 +190,7 @@ always@(posedge clk_sys) begin : main_proc
 			cmd <= io_din;
 			dout_en <= (io_din >= EXT_CMD_MIN && io_din <= EXT_CMD_MAX) || (io_din >= EXT_CMD_MIN2 && io_din <= EXT_CMD_MAX2);
 			if(io_din == 'h63) io_dout <= {akiko_rst_cnt, cdtv_card_dirty, cdtv_nvr_dirty, akiko_req, akiko_sec_req, akiko_rx_busy, cdda_req, akiko_nvr_dirty, cdtv_req, ide_req};
+			if(io_din == 'h64) io_dout <= {smp_req, smp_deep, 1'b1, smp_dbg};
 			if(io_din == UIO_GET_VMODE) io_dout <= 1;
 		end else begin
 			case(cmd)
@@ -250,12 +251,6 @@ always@(posedge clk_sys) begin : main_proc
 						3: svbl_t <= io_din[11:0];
 						4: svbl_b <= io_din[11:0];
 					endcase
-
-				'h63:
-					// Second status word: bit 15 = sampler FIFO has room for a burst,
-					// bit 14 = deep buffering (Toccata record active).
-					// The first word is full (akiko_rst_cnt uses bits 15:14).
-					if(byte_cnt == 1) io_dout <= {smp_req, smp_deep, 1'b1, smp_dbg};
 
 				'h61: begin
 					// Payload follows both address words; the counter saturates

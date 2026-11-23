@@ -25,6 +25,7 @@ module toccata #(
     output logic [15:0] out_left,
     output logic [15:0] out_right,
     // Record source (usb_sampler, 48 kHz)
+    input  wire         ntsc,
     input  wire         smp_ce,
     input  wire signed [15:0] smp_l,
     input  wire signed [15:0] smp_r,
@@ -221,12 +222,11 @@ assign cap_rd_sel = sel && rd && ad.cen && ({addr[14], addr[13], addr[11]} == CO
 assign cap_rd     = cap_rd_q && !cap_rd_sel;
 always_ff @(posedge clk) cap_rd_q <= cap_rd_sel;
 
-toccata_capture #(
-    .CLK_FREQUENCY(CLK_FREQUENCY)
-) my_capture (
+toccata_capture my_capture (
     .clk(clk),
     .rst(rst),
 
+    .ntsc(ntsc),
     .cen(ad.cen),
     .freq_sel(ad.freq_sel),
     .sm(ad.sm),
