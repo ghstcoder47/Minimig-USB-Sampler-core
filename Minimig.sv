@@ -653,6 +653,46 @@ wire        mem2_readdatavalid, mem2_waitrequest;
 wire [28:0] dsnd_addr;
 wire        dsnd_rd, dsnd_busy, dsnd_ready;
 
+wire [28:0] smpd_addr, mux_addr;
+wire        smpd_rd, smpd_busy, smpd_ready, mux_rd, mux_busy, mux_ready;
+wire        smp_fw;
+wire [31:0] smp_fdata;
+
+// One read port towards the DDR3 arbiter, shared by the drive sounds and the USB capture ring.
+ddr_rd_mux2 smp_mux
+(
+	.clk    (clk_114),
+	.rst    (reset_d),
+	.a_addr (dsnd_addr),
+	.a_rd   (dsnd_rd),
+	.a_busy (dsnd_busy),
+	.a_ready(dsnd_ready),
+	.b_addr (smpd_addr),
+	.b_rd   (smpd_rd),
+	.b_busy (smpd_busy),
+	.b_ready(smpd_ready),
+	.m_addr (mux_addr),
+	.m_rd   (mux_rd),
+	.m_busy (mux_busy),
+	.m_ready(mux_ready)
+);
+
+usb_ddr_reader smp_ddr
+(
+	.clk           (clk_114),
+	.rst           (reset_d),
+	.ddr_addr      (smpd_addr),
+	.ddr_rd        (smpd_rd),
+	.ddr_busy      (smpd_busy),
+	.ddr_dout      (DDRAM_DOUT),
+	.ddr_dout_ready(smpd_ready),
+	.fifo_req      (smp_req),
+	.deep          (smp_deep),
+	.clk_sys       (clk_sys),
+	.fw            (smp_fw),
+	.fdata         (smp_fdata)
+);
+
 a2065_ddram_arbiter dsnd_arb
 (
 	.clk             (clk_114),
@@ -668,15 +708,15 @@ a2065_ddram_arbiter dsnd_arb
 	.m0_write        (a2065_mem_write),
 	.m0_waitrequest  (a2065_mem_waitrequest),
 
-	.m1_address      (dsnd_addr),
+	.m1_address      (mux_addr),
 	.m1_burstcount   (8'd1),
-	.m1_read         (dsnd_rd),
+	.m1_read         (mux_rd),
 	.m1_readdata     (),
-	.m1_readdatavalid(dsnd_ready),
+	.m1_readdatavalid(mux_ready),
 	.m1_writedata    (64'd0),
 	.m1_byteenable   (8'hFF),
 	.m1_write        (1'b0),
-	.m1_waitrequest  (dsnd_busy),
+	.m1_waitrequest  (mux_busy),
 
 	.s_address       (mem2_address),
 	.s_burstcount    (mem2_burstcount),
@@ -1481,6 +1521,8 @@ usb_sampler #(28375160, 28636360) usb_sampler
 	.start(smp_start),
 	.wr(smp_wr),
 	.din(smp_dout),
+	.fw(smp_fw),
+	.fdata(smp_fdata),
 	.req(smp_req),
 	.deep(smp_deep),
 	.min_lvl(smp_min_lvl),

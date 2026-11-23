@@ -25,6 +25,8 @@ module usb_sampler #(parameter CLK_RATE = 28375160, parameter CLK_RATE_NTSC = 28
 	input             start,      // pulse: new write transaction, resets word phase
 	input             wr,         // pulse: one 16-bit word in din
 	input      [15:0] din,
+	input             fw,         // pulse: one complete {left, right} frame in fdata (DDR3 reader)
+	input      [31:0] fdata,
 	output            req,        // status word 2 bit 15: room for a 512-frame burst
 
 	// Minimig switches PRB back to the joystick inputs when active expires.
@@ -70,6 +72,11 @@ always @(posedge clk) begin
 				wr_ptr <= wr_ptr + 1'd1;
 			end
 		end
+
+		else if (fw && level != 2**AW) begin
+			mem[wr_ptr[AW-1:0]] <= fdata;
+			wr_ptr <= wr_ptr + 1'd1;
+		end
 	end
 end
 
@@ -114,7 +121,7 @@ always @(posedge clk) begin
 		out_r    <= 0;
 	end
 	else begin
-		if (start) idle_cnt <= IDLE_TICKS; // default timeout: 0.5 s at 48 kHz
+		if (start || fw) idle_cnt <= IDLE_TICKS; // default timeout: 0.5 s at 48 kHz
 
 		if (cen_48k) begin
 			if (idle_cnt && !start) idle_cnt <= idle_cnt - 1'd1;
