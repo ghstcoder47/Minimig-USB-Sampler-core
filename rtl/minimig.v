@@ -247,12 +247,22 @@ module minimig
 	output [8:0]  rdata_okk,   // right DAC data (PWM volume)
 	output  [1:0] aud_mix,
 
+	// USB audio sampler (parallel port)
+	// PRB input supplied by usb_sampler in the outer MiSTer module.
+	input         smp_active,
+	input         smp_ce,
+	input  [15:0] smp_l,
+	input  [15:0] smp_r,
+	input   [7:0] smp_u8,
+
 	// Toccata audio
 	input         toccata_ena,
 	input   [7:0] toccata_base,
 	input   [7:0] cdtv_base,
 	output [15:0] toccata_aud_left,
 	output [15:0] toccata_aud_right,
+	output        toccata_rec,
+	output [12:0] toccata_dbg,
 
 	// A2065 Ethernet
 	input         a2065_ena,
@@ -750,7 +760,8 @@ ciaa CIAA1
 	.irq(int2),
 	.porta_in({_fire1,_fire0,_ready,_track0,_wprot,_change}),
 	.porta_out(porta_out),
-	.portb_in({_joy4[0],_joy4[1],_joy4[2],_joy4[3],_joy3[0],_joy3[1],_joy3[2],_joy3[3]}),
+	// Preserve joystick 3/4 wiring when host streaming has timed out.
+	.portb_in(smp_active ? smp_u8 : {_joy4[0],_joy4[1],_joy4[2],_joy4[3],_joy3[0],_joy3[1],_joy3[2],_joy3[3]}),
 	.kbd_mouse_type(kbd_mouse_type),
 	.kms_level(kms_level),
 	.kbd_mouse_data(kbd_mouse_data), 
@@ -1041,7 +1052,14 @@ toccata #(
 	.sel(sel_toccata),
 	.toc_int(int6_toccata),
 	.out_left(toccata_aud_left),
-	.out_right(toccata_aud_right)
+	.out_right(toccata_aud_right),
+	.ntsc(ntsc),
+	.smp_ce(smp_ce),
+	.smp_l(smp_l),
+	.smp_r(smp_r),
+	.smp_active(smp_active),
+	.rec_dbg(toccata_dbg),
+	.rec_active(toccata_rec)
 );
 
 //-------------------------------------------------------------------------------------

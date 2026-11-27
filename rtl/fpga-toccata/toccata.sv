@@ -23,7 +23,15 @@ module toccata #(
     output logic        toc_int, // Toccata interrupt active high
     // Audio output
     output logic [15:0] out_left,
-    output logic [15:0] out_right
+    output logic [15:0] out_right,
+    // Record source (usb_sampler, 48 kHz)
+    input  wire         ntsc,
+    input  wire         smp_ce,
+    input  wire signed [15:0] smp_l,
+    input  wire signed [15:0] smp_r,
+    input  wire         smp_active,
+    output wire [12:0]  rec_dbg,
+    output wire         rec_active // record FIFO is being read by the Amiga
 );
 
 // Reset values for ad1848 registers
@@ -193,33 +201,51 @@ toccata_playback #(
     .endata(fifo.endata)
 );
 
-// Dummy Toccata audio capture module
+// Toccata audio capture, fed by the USB sampler stream
 struct {
     logic [7:0] data_out;
-    logic       rd;
     logic       empty;
     logic       half_full;
     logic       full;
     logic       endata;
 } cap;
-toccata_capture #(
-    .CLK_FREQUENCY(CLK_FREQUENCY)
-) my_capture (
+// The record FIFO pops when the CPU read of the FIFO window ends, so the byte
+// seen by the CPU is the one that is removed.
+logic cap_rd;
+assign rec_active = ad.cen;
+wire [12:0] rec_dbg_w;
+assign rec_dbg = rec_dbg_w;
+logic cap_hold;
+logic [8:0] cap_pop_cnt;
+logic cap_rd_sel, cap_rd_q;
+assign cap_rd_sel = sel && rd && ad.cen && ({addr[14], addr[13], addr[11]} == CODEC_FIFO);
+assign cap_rd     = cap_rd_q && !cap_rd_sel;
+always_ff @(posedge clk) cap_rd_q <= cap_rd_sel;
+
+toccata_capture my_capture (
     .clk(clk),
     .rst(rst),
 
+    .ntsc(ntsc),
     .cen(ad.cen),
     .freq_sel(ad.freq_sel),
     .sm(ad.sm),
     .fmt(ad.fmt),
+    .lc(ad.lc),
     .css(ad.css),
 
+    .src_ce(smp_ce),
+    .src_l(smp_l),
+    .src_r(smp_r),
+    .src_active(smp_active),
+
     .data_out(cap.data_out),
-    .rd(cap.rd),
+    .rd(cap_rd),
     .empty(cap.empty),
     .half_full(cap.half_full),
     .full(cap.full),
 
+    .dbg(rec_dbg_w),
     .endata(cap.endata)
 );
 
@@ -338,7 +364,16 @@ always_ff @(posedge clk) begin
             irq_reg[IRQ_PLAY_HALF] <= 1'b1; // Half empty interrupt
         end
         // Capture half full interrupt
-        if (cap.half_full && toc_status[STATUS_FIFO_RECORD] == 1'b1 && toc_status[STATUS_RECORD_INTENA] == 1'b1) begin
+        // After the status read the library reads 512 bytes. Hold off the next record
+        // interrupt until they are consumed, otherwise it fires again while the FIFO is
+        // still half full and the library then reads stale data.
+        if (cap_rd) begin
+            cap_pop_cnt <= cap_pop_cnt + 1'd1;
+            if (cap_pop_cnt == 9'd511) cap_hold <= 1'b0;
+        end
+        // Also release when the library stopped reading and the FIFO fell below half.
+        if (toc_status[STATUS_FIFO_RECORD] == 1'b0 || !cap.half_full) cap_hold <= 1'b0;
+        if (cap.half_full && !cap_hold && toc_status[STATUS_FIFO_RECORD] == 1'b1 && toc_status[STATUS_RECORD_INTENA] == 1'b1) begin
             irq_reg[IRQ_RECORD_HALF] <= 1'b1; // Half full interrupt
         end
 
@@ -486,6 +521,10 @@ always_ff @(posedge clk) begin
                         // Clear the interrupt register after reading
                         // IRQ_INT_IRQ is active low, so reset
                         clear_irq <= 1'b1;
+                        if (irq_reg[IRQ_RECORD_HALF]) begin
+                            cap_hold <= 1'b1;
+                            cap_pop_cnt <= 9'd0;
+                        end
 
                         // Return the current interrupt status register
                         data_out <= {irq_reg, irq_reg};
@@ -498,8 +537,9 @@ always_ff @(posedge clk) begin
                             end
                             data_out <= {8'h00, fifo.data_out};
                         end else begin
-                            // Return dummy value from record module
-                            data_out <= {8'h00, cap.data_out};
+                            // toccata.library reads the FIFO with byte reads or movep at the
+                            // even address $2000, which takes D15-D8. Drive both byte lanes.
+                            data_out <= {cap.data_out, cap.data_out};
                         end
                     end
                     CODEC_REG_1: begin // 60xx - INDEX REGISTER

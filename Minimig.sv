@@ -4,6 +4,10 @@
 /* 2017-2020 Alexey Melnikov                */
 /********************************************/
 
+// Connects the Amiga chipset to MiSTer clocks, host I/O and audio/video.
+// USB capture travels from hps_ext through usb_sampler to the CIA-A PRB mux;
+// all sampler signals use clk_sys, whose frequency follows PAL/NTSC.
+
 module emu
 (
 	`include "sys/emu_ports.vh"
@@ -116,6 +120,19 @@ wire        akiko_cs_sec;
 wire        akiko_cs_nvr;
 wire        akiko_cs_subcode;
 wire        akiko_req;
+wire        smp_req;
+wire        smp_deep;
+wire [12:0] smp_dbg_c;
+wire  [3:0] smp_min_lvl;
+wire [12:0] smp_dbg = {smp_dbg_c[12:8], smp_min_lvl, smp_dbg_c[3:0]};
+wire        smp_start;
+wire        smp_wr;
+wire [15:0] smp_dout;
+wire        smp_active;
+wire        smp_ce;
+wire [15:0] smp_l;
+wire [15:0] smp_r;
+wire  [7:0] smp_u8;
 wire        akiko_sec_req;
 wire        akiko_rx_busy;
 wire        akiko_nvr_dirty;
@@ -636,6 +653,48 @@ wire        mem2_readdatavalid, mem2_waitrequest;
 wire [28:0] dsnd_addr;
 wire        dsnd_rd, dsnd_busy, dsnd_ready;
 
+wire [28:0] smpd_addr, mux_addr;
+wire        smpd_rd, smpd_busy, smpd_ready, mux_rd, mux_busy, mux_ready;
+wire        smp_mon_c;
+wire        smp_fw;
+wire [31:0] smp_fdata;
+
+// One read port towards the DDR3 arbiter, shared by the drive sounds and the USB capture ring.
+ddr_rd_mux2 smp_mux
+(
+	.clk    (clk_114),
+	.rst    (reset_d),
+	.a_addr (dsnd_addr),
+	.a_rd   (dsnd_rd),
+	.a_busy (dsnd_busy),
+	.a_ready(dsnd_ready),
+	.b_addr (smpd_addr),
+	.b_rd   (smpd_rd),
+	.b_busy (smpd_busy),
+	.b_ready(smpd_ready),
+	.m_addr (mux_addr),
+	.m_rd   (mux_rd),
+	.m_busy (mux_busy),
+	.m_ready(mux_ready)
+);
+
+usb_ddr_reader smp_ddr
+(
+	.clk           (clk_114),
+	.rst           (reset_d),
+	.ddr_addr      (smpd_addr),
+	.ddr_rd        (smpd_rd),
+	.ddr_busy      (smpd_busy),
+	.ddr_dout      (DDRAM_DOUT),
+	.ddr_dout_ready(smpd_ready),
+	.fifo_req      (smp_req),
+	.deep          (smp_deep),
+	.clk_sys       (clk_sys),
+	.fw            (smp_fw),
+	.fdata         (smp_fdata),
+	.mon_en        (smp_mon_c)
+);
+
 a2065_ddram_arbiter dsnd_arb
 (
 	.clk             (clk_114),
@@ -651,15 +710,15 @@ a2065_ddram_arbiter dsnd_arb
 	.m0_write        (a2065_mem_write),
 	.m0_waitrequest  (a2065_mem_waitrequest),
 
-	.m1_address      (dsnd_addr),
+	.m1_address      (mux_addr),
 	.m1_burstcount   (8'd1),
-	.m1_read         (dsnd_rd),
+	.m1_read         (mux_rd),
 	.m1_readdata     (),
-	.m1_readdatavalid(dsnd_ready),
+	.m1_readdatavalid(mux_ready),
 	.m1_writedata    (64'd0),
 	.m1_byteenable   (8'hFF),
 	.m1_write        (1'b0),
-	.m1_waitrequest  (dsnd_busy),
+	.m1_waitrequest  (mux_busy),
 
 	.s_address       (mem2_address),
 	.s_burstcount    (mem2_burstcount),
@@ -933,6 +992,12 @@ minimig minimig
 
 	.aud_mix      (AUDIO_MIX        ),
 
+	// The sampler stream feeds the parallel port (PRB) and the Toccata record FIFO.
+	.smp_active   (smp_active),
+	.smp_ce       (smp_ce),
+	.smp_l        (smp_l),
+	.smp_r        (smp_r),
+	.smp_u8       (smp_u8),
 	//toccata soundcard
 	.toccata_ena  (toccata_ena),
 	.toccata_base (toccata_base),
@@ -941,6 +1006,8 @@ minimig minimig
 	.a2065_base (a2065_base),
 	.toccata_aud_left (toccata_aud_left),
 	.toccata_aud_right(toccata_aud_right),
+	.toccata_rec(smp_deep),
+	.toccata_dbg(smp_dbg_c),
 
 	.cdtv_mode           (cdtv_mode            ),
 
@@ -1445,6 +1512,29 @@ always @(posedge CLK_AUDIO) begin
 	if(old_r0 == old_r1) aud_r <= old_r1;
 end
 
+// The host supplies mono as identical L/R words; only the PRB byte is consumed.
+usb_sampler #(28375160, 28636360) usb_sampler
+(
+	.clk(clk_sys),
+	.reset(reset),
+	.ntsc(ntsc),
+	.signed_out(status[56]),
+	.dither_mode(status[58:57]),
+	.start(smp_start),
+	.wr(smp_wr),
+	.din(smp_dout),
+	.fw(smp_fw),
+	.fdata(smp_fdata),
+	.req(smp_req),
+	.deep(smp_deep),
+	.min_lvl(smp_min_lvl),
+	.active(smp_active),
+	.ce(smp_ce),
+	.out_l(smp_l),
+	.out_r(smp_r),
+	.out_u8(smp_u8)
+);
+
 wire  [15:0] cdda_l;
 wire  [15:0] cdda_r;
 wire  [15:0] cdda_dout;
@@ -1486,16 +1576,33 @@ always @(posedge CLK_AUDIO) begin
 	if(old_d0 == old_d1) {dsnd_al, dsnd_ar} <= old_d1;
 end
 
+// Live monitor of the USB input (OSD switch via the ring header), at -6 dB.
+reg [1:0] smp_mon_s;
+always @(posedge CLK_AUDIO) smp_mon_s <= {smp_mon_s[0], smp_mon_c};
+wire smp_mon = smp_mon_s[1];
+reg [15:0] mon_l, mon_r;
+always @(posedge CLK_AUDIO) begin
+	reg [31:0] old_m0, old_m1;
+	reg        act0, act1;
+
+	act0 <= smp_active && smp_mon;
+	act1 <= act0;
+	old_m0 <= {smp_l, smp_r};
+	old_m1 <= old_m0;
+	if(old_m0 == old_m1) {mon_l, mon_r} <= act1 ? {old_m1[31], old_m1[31:17], old_m1[15], old_m1[15:1]} : 32'd0;
+	if(!act1) {mon_l, mon_r} <= 32'd0;
+end
+
 reg [15:0] out_l, out_r;
 always @(posedge CLK_AUDIO) begin
-	reg [17:0] tmp_l, tmp_r;
+	reg [18:0] tmp_l, tmp_r;
 
-	tmp_l <= {{2{aud_l[15]}},aud_l} + {{2{toccata_aud_left[15]}},toccata_aud_left} + (mt32_mute ? 18'd0 : {{2{mt32_i2s_l[15]}},mt32_i2s_l}) + {{2{cdda_sl[15]}}, cdda_sl} + {{2{dsnd_al[15]}}, dsnd_al};
-	tmp_r <= {{2{aud_r[15]}},aud_r} + {{2{toccata_aud_right[15]}},toccata_aud_right} + (mt32_mute ? 18'd0 : {{2{mt32_i2s_r[15]}},mt32_i2s_r}) + {{2{cdda_sr[15]}}, cdda_sr} + {{2{dsnd_ar[15]}}, dsnd_ar};
+	tmp_l <= {{3{aud_l[15]}},aud_l} + {{3{toccata_aud_left[15]}},toccata_aud_left} + (mt32_mute ? 19'd0 : {{3{mt32_i2s_l[15]}},mt32_i2s_l}) + {{3{cdda_sl[15]}}, cdda_sl} + {{3{dsnd_al[15]}}, dsnd_al} + {{3{mon_l[15]}}, mon_l};
+	tmp_r <= {{3{aud_r[15]}},aud_r} + {{3{toccata_aud_right[15]}},toccata_aud_right} + (mt32_mute ? 19'd0 : {{3{mt32_i2s_r[15]}},mt32_i2s_r}) + {{3{cdda_sr[15]}}, cdda_sr} + {{3{dsnd_ar[15]}}, dsnd_ar} + {{3{mon_r[15]}}, mon_r};
 
 	// clamp the output
-	out_l <= (tmp_l[17:15] == 3'b000 || tmp_l[17:15] == 3'b111) ? tmp_l[15:0] : {tmp_l[17], {15{~tmp_l[17]}}};
-	out_r <= (tmp_r[17:15] == 3'b000 || tmp_r[17:15] == 3'b111) ? tmp_r[15:0] : {tmp_r[17], {15{~tmp_r[17]}}};
+	out_l <= (tmp_l[18:15] == 4'b0000 || tmp_l[18:15] == 4'b1111) ? tmp_l[15:0] : {tmp_l[18], {15{~tmp_l[18]}}};
+	out_r <= (tmp_r[18:15] == 4'b0000 || tmp_r[18:15] == 4'b1111) ? tmp_r[15:0] : {tmp_r[18], {15{~tmp_r[18]}}};
 end
 
 assign AUDIO_S = 1;
